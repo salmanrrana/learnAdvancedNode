@@ -19,6 +19,7 @@ app.get('/', (req, res) => {
 
   worker.onmessage = function(message) {
     console.log('message is: ', message.data);
+    console.log(message);
     res.send('' + message.data);
   };
 
