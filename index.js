@@ -1,78 +1,52 @@
-// This is using webworkers ******
-// I am a child. Im going to act like a server and do nothing else
+// Require in a few modules
 const express = require('express');
-const crypto = require('crypto');
+const mongoose = require('mongoose');
+const cookieSession = require('cookie-session');
+const passport = require('passport');
+const bodyParser = require('body-parser');
+const keys = require('./config/keys');
+
+// Register a couple of models with mongoose
+require('./models/User');
+require('./models/Blog');
+// Set up passport for authentication
+require('./services/passport');
+require('./services/cache');
+
+// Set up our Mongoose instance
+mongoose.Promise = global.Promise;
+mongoose.connect(keys.mongoURI, { useMongoClient: true });
+
+// Create our Express Application
 const app = express();
-const Worker = require('webworker-threads').Worker;
 
-app.get('/', (req, res) => {
-  const worker = new Worker(function() {
-    this.onmessage = function() {
-      let counter = 0;
-      while (counter < 1e9) {
-        counter++;
-      }
+// Set up a few  Middlware
+app.use(bodyParser.json());
+app.use(
+  cookieSession({
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    keys: [keys.cookieKey]
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
 
-      postMessage(counter);
-    };
+// Register our Event handlers
+require('./routes/authRoutes')(app);
+require('./routes/blogRoutes')(app);
+
+// Set up some  production file serving
+if (['production'].includes(process.env.NODE_ENV)) {
+  app.use(express.static('client/build'));
+
+  const path = require('path');
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve('client', 'build', 'index.html'));
   });
+}
 
-  worker.onmessage = function(message) {
-    console.log('message is: ', message.data);
-    console.log(message);
-    res.send('' + message.data);
-  };
-
-  worker.postMessage();
+// Now our App is listening on a port
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Listening on port`, PORT);
 });
-
-app.get('/fast', (req, res) => {
-  res.send('This was fast');
-});
-
-app.listen(3000);
-
-//*****an overview if how it would be with clustering and us having to code it out
-// process.env.UV_THREADPOOL_SIZE = 1;
-// const cluster = require('cluster');
-//
-// // Is the file being executed in master mode?
-// if (cluster.isMaster) {
-//   // Cause index.js to be executed *again* but in child mode
-//   cluster.fork();
-//   cluster.fork();
-//   cluster.fork();
-// } else {
-//   // I am a child. Im going to act like a server and do nothing else
-//   const express = require('express');
-//   const crypto = require('crypto');
-//   const app = express();
-//
-//   app.get('/', (req, res) => {
-//     crypto.pbkdf2('a', 'b', 100000, 512, 'sha512', () => {
-//       res.send('Hi there!');
-//     });
-//   });
-//
-//   app.get('/fast', (req, res) => {
-//     res.send('This was fast');
-//   });
-//
-//   app.listen(3000);
-// }
-
-// ****EXPRESS APP BEFORE USING CLUSTERING***
-// const express = require('express');
-// const app = express();
-//
-// function doWork(duration) {
-//   const start = Date.now();
-//   while (Date.now() - start < duration) {}
-// }
-//
-// app.get('/', (req, res) => {
-//   doWork(5000);
-//   res.send('Hi there!');
-// });
-//
-// app.listen(3000);
