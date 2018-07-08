@@ -6,6 +6,8 @@ const passport = require('passport');
 const bodyParser = require('body-parser');
 const keys = require('./config/keys');
 
+//for real
+
 // Register a couple of models with mongoose
 require('./models/User');
 require('./models/Blog');
